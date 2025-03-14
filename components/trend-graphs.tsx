@@ -26,25 +26,93 @@ const data = [
   },
 ]
 
-const mainGraphConfigs = {
-  creatinine: { color: "#8884d8", unit: "mg/dL", label: "Creatinine", shape: "circle" },
-  prografTrough: { color: "#82ca9d", unit: "ng/mL", label: "Prograf Trough", shape: "square" },
-  potassium: { color: "#ffc658", unit: "mEq/L", label: "Potassium", shape: "triangle" },
+// Health ranges
+const healthRanges = {
+  creatinine: { min: 0.7, max: 1.3, unit: "mg/dL" },
+  potassium: { min: 3.5, max: 5.0, unit: "mEq/L" },
+  prografTrough: { min: 6, max: 8, unit: "ng/mL" },
 }
 
-const dosageConfig = { color: "#ff7300", unit: "mg", label: "Prograf Dosage" }
+// Line configurations
+const mainGraphConfigs = [
+  { dataKey: "creatinine", color: "#8884d8", unit: "mg/dL", label: "Creatinine", pattern: "solid" },
+  { dataKey: "prografTrough", color: "#82ca9d", unit: "ng/mL", label: "Prograf Trough", pattern: "dashed" },
+  { dataKey: "potassium", color: "#ffc658", unit: "mEq/L", label: "Potassium", pattern: "dotted" },
+]
 
-const CustomShape = (props) => {
-  const { cx, cy, fill, shape } = props
+const dosageConfig = { dataKey: "dosage", color: "#ff7300", unit: "mg", label: "Prograf Dosage", pattern: "solid" }
 
-  if (shape === "circle") {
-    return <circle cx={cx} cy={cy} r={4} fill={fill} />
-  } else if (shape === "square") {
-    return <rect x={cx - 4} y={cy - 4} width={8} height={8} fill={fill} />
-  } else if (shape === "triangle") {
-    return <polygon points={`${cx},${cy - 4} ${cx - 4},${cy + 4} ${cx + 4},${cy + 4}`} fill={fill} />
+// Custom tooltip renderer
+const renderColorfulTooltipContent = (props) => {
+  const { active, payload, label } = props
+
+  if (!active || !payload || !payload.length) {
+    return null
   }
-  return null
+
+  return (
+    <div className="bg-white p-2 border border-gray-300 rounded shadow-md">
+      <p className="font-bold">{`Month: ${label}`}</p>
+      <div>
+        {payload.map((entry, index) => {
+          const dataKey = entry.dataKey
+          const value = entry.value
+
+          // Get label and unit based on dataKey
+          let label, unit
+          if (dataKey === "creatinine") {
+            label = "Creatinine"
+            unit = "mg/dL"
+          } else if (dataKey === "prografTrough") {
+            label = "Prograf Trough"
+            unit = "ng/mL"
+          } else if (dataKey === "potassium") {
+            label = "Potassium"
+            unit = "mEq/L"
+          } else if (dataKey === "dosage") {
+            label = "Prograf Dosage"
+            unit = "mg"
+          }
+
+          const range = healthRanges[dataKey]
+
+          // Check if value is outside healthy range
+          const isOutOfRange = range && (value < range.min || value > range.max)
+
+          return (
+            <p key={`item-${index}`} style={{ color: isOutOfRange ? "red" : "inherit" }}>
+              {`${label}: ${value} ${unit}`}
+              {isOutOfRange ? " (Out of range)" : ""}
+            </p>
+          )
+        })}
+        <p className="mt-1 pt-1 border-t border-gray-200">
+          <strong>Adjustment:</strong> {payload[0].payload.adjustment}
+        </p>
+      </div>
+    </div>
+  )
+}
+
+// Manual legend component
+const ManualLegend = ({ items }) => {
+  return (
+    <div className="flex justify-center items-center space-x-6 mb-4">
+      {items.map((item, index) => (
+        <div key={index} className="flex items-center">
+          <div
+            className="w-10 h-0 mr-2"
+            style={{
+              borderTopWidth: "3px",
+              borderTopStyle: item.pattern === "dashed" ? "dashed" : item.pattern === "dotted" ? "dotted" : "solid",
+              borderTopColor: item.color,
+            }}
+          />
+          <span style={{ color: item.color }}>{item.label}</span>
+        </div>
+      ))}
+    </div>
+  )
 }
 
 export default function TrendGraphs() {
@@ -63,6 +131,8 @@ export default function TrendGraphs() {
           </TabsList>
           <TabsContent value="main">
             <h3 className="text-lg font-semibold mb-2">Creatinine, Prograf Trough, and Potassium Levels</h3>
+            {/* Manual legend */}
+            <ManualLegend items={mainGraphConfigs} />
             <div className="h-[400px]">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 40 }}>
@@ -73,35 +143,50 @@ export default function TrendGraphs() {
                     tick={{ fontSize: 12 }}
                   />
                   <YAxis />
-                  <Tooltip
-                    formatter={(value, name, props) => {
-                      const config = mainGraphConfigs[name as keyof typeof mainGraphConfigs]
-                      if (config) {
-                        return [`${config.label}: ${value} ${config.unit}`, name]
-                      }
-                      return [value, name]
-                    }}
-                    labelFormatter={(label) => `Month: ${label}`}
+                  <Tooltip content={renderColorfulTooltipContent} />
+
+                  {/* Creatinine: Solid line with circle markers */}
+                  <Line
+                    type="monotone"
+                    dataKey="creatinine"
+                    stroke="#8884d8"
+                    strokeWidth={3}
+                    dot={{ r: 6, strokeWidth: 3 }}
+                    activeDot={{ r: 8, strokeWidth: 3 }}
+                    name="Creatinine"
                   />
-                  <Legend layout="horizontal" verticalAlign="top" align="center" />
-                  {Object.entries(mainGraphConfigs).map(([key, config]) => (
-                    <Line
-                      key={key}
-                      type="monotone"
-                      dataKey={key}
-                      stroke={config.color}
-                      strokeWidth={2}
-                      dot={<CustomShape shape={config.shape} fill={config.color} />}
-                      activeDot={<CustomShape shape={config.shape} fill={config.color} />}
-                      name={config.label}
-                    />
-                  ))}
+
+                  {/* Prograf Trough: Dashed line with larger markers */}
+                  <Line
+                    type="monotone"
+                    dataKey="prografTrough"
+                    stroke="#82ca9d"
+                    strokeWidth={3}
+                    strokeDasharray="5 5"
+                    dot={{ r: 6, strokeWidth: 3 }}
+                    activeDot={{ r: 8, strokeWidth: 3 }}
+                    name="Prograf Trough"
+                  />
+
+                  {/* Potassium: Dotted line with smaller markers */}
+                  <Line
+                    type="monotone"
+                    dataKey="potassium"
+                    stroke="#ffc658"
+                    strokeWidth={3}
+                    strokeDasharray="2 2"
+                    dot={{ r: 6, strokeWidth: 3 }}
+                    activeDot={{ r: 8, strokeWidth: 3 }}
+                    name="Potassium"
+                  />
                 </LineChart>
               </ResponsiveContainer>
             </div>
           </TabsContent>
           <TabsContent value="dosage">
             <h3 className="text-lg font-semibold mb-2">Prograf Dosage</h3>
+            {/* Manual legend */}
+            <ManualLegend items={[dosageConfig]} />
             <div className="h-[400px]">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 40 }}>
@@ -112,19 +197,15 @@ export default function TrendGraphs() {
                     tick={{ fontSize: 12 }}
                   />
                   <YAxis />
-                  <Tooltip
-                    formatter={(value) => [`${dosageConfig.label}: ${value} ${dosageConfig.unit}`, dosageConfig.label]}
-                    labelFormatter={(label) => `Month: ${label}`}
-                  />
-                  <Legend layout="horizontal" verticalAlign="top" align="center" />
+                  <Tooltip content={renderColorfulTooltipContent} />
                   <Line
                     type="monotone"
                     dataKey="dosage"
-                    stroke={dosageConfig.color}
-                    strokeWidth={2}
-                    dot={{ r: 5 }}
-                    activeDot={{ r: 8 }}
-                    name={dosageConfig.label}
+                    stroke="#ff7300"
+                    strokeWidth={3}
+                    dot={{ r: 6, strokeWidth: 3 }}
+                    activeDot={{ r: 8, strokeWidth: 3 }}
+                    name="Prograf Dosage"
                   />
                 </LineChart>
               </ResponsiveContainer>
@@ -147,4 +228,3 @@ export default function TrendGraphs() {
     </Card>
   )
 }
-
