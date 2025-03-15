@@ -1,5 +1,6 @@
 import PatientInfo from "@/components/patient-info"
 import TrendGraphs from "@/components/trend-graphs"
+import TrendTables from "@/components/trend-tables"
 import DosageRecommendation from "@/components/dosage-recommendation"
 
 export default function Dashboard() {
@@ -11,7 +12,8 @@ export default function Dashboard() {
           <PatientInfo />
         </div>
         <div className="md:col-span-2">
-          <TrendGraphs />
+          {/* <TrendGraphs /> */}
+          <TrendTables/>
           <DosageRecommendation />
         </div>
       </div>
